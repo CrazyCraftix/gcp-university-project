@@ -1,0 +1,64 @@
+name: deploy to gcp
+
+on:
+  workflow_dispatch
+
+permissions:
+  contents: write
+
+env:
+  TERRAFORM_STATE_BRANCH_NAME: terraform-state
+  ENCRYPTED_TERRAFORM_STATE_FILE_NAME: terraform.tfstate.enc
+
+jobs:
+  deploy_to_gcp:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout encrypted terraform-state file
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          path: ./terraform-state
+          ref: ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
+          sparse-checkout: |
+            ${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+          sparse-checkout-cone-mode: false
+
+      - name: checkout project files
+        uses: actions/checkout@v4
+        with:
+          path: ./project
+
+      - name: decrypt terraform-state file
+        continue-on-error: true
+        run: openssl enc -d -in ./terraform-state/${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }} -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}"  -out ./project/terraform.tfstate
+
+      - name: setup terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: run terraform apply
+        working-directory: ./project
+        run: |
+          terraform init
+          terraform fmt --check
+          terraform plan
+          terraform apply --auto-approve
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+
+      - name: encrypt new terraform-state file
+        run: openssl enc -in ./project/terraform.tfstate -aes-256-cbc -pbkdf2 -pass  pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}" -out ./terraform-state/${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+
+      - name: push new encrypted terraform-state file
+        working-directory: ./terraform-state
+        run: |
+          # create terraform-state branch if it doesn't exist yet
+          git ls-remote --exit-code --heads origin ${{ env.TERRAFORM_STATE_BRANCH_NAME }} || git switch --orphan ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
+
+          git config user.name "${{github.actor}}"
+          git config user.email "${{github.actor}}@users.noreply.github.com"
+
+          git add ${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+          git commit -m "new state after deploy_to_gcp"
+          git push -u origin ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
