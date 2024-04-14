@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+common = { version = "0.1.0", path = "../common" }
 gloo-net = "0.5.0"
 log = "0.4.21"
 serde = "1.0.197"

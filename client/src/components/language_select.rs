@@ -1,15 +1,9 @@
 use yew::TargetCast as _;
 
-#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
-pub struct Language {
-    pub id: usize,
-    pub display_string: String,
-}
-
 #[derive(yew::Properties, PartialEq)]
 pub struct Props {
-    pub languages: Vec<Language>,
-    pub selected_language: std::rc::Rc<std::cell::RefCell<Option<Language>>>,
+    pub languages: Vec<common::Language>,
+    pub selected_language: std::rc::Rc<std::cell::RefCell<Option<common::Language>>>,
 }
 
 #[yew::function_component(LanguageSelect)]
