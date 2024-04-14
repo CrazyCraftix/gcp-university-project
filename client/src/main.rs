@@ -1,99 +1,84 @@
-use gloo_net::http::Request;
-use yew::prelude::*;
+mod components;
+use std::borrow::Borrow;
 
-#[derive(Clone, PartialEq, serde::Deserialize)]
-struct Video {
-    id: usize,
-    title: String,
-    speaker: String,
-    url: String,
-}
+use components::language_select::Language;
 
-#[derive(Properties, PartialEq)]
-struct VideoListProps {
-    videos: Vec<Video>,
-    on_click: Callback<Video>,
-}
-#[function_component(VideoList)]
-fn video_list(VideoListProps { videos, on_click }: &VideoListProps) -> Html {
-    videos
-        .iter()
-        .map(|video| {
-            let on_video_select = {
-                let video = video.clone();
-                let on_click = on_click.clone();
-                Callback::from(move |_| on_click.emit(video.clone()))
+#[yew::function_component(App)]
+fn app() -> yew::Html {
+    let languages = vec![
+        Language {
+            id: 0,
+            display_string: "English".into(),
+        },
+        Language {
+            id: 1,
+            display_string: "French".into(),
+        },
+        Language {
+            id: 2,
+            display_string: "Spanish".into(),
+        },
+        Language {
+            id: 3,
+            display_string: "German".into(),
+        },
+    ];
+
+    // state of the app
+    let selected_input_language = yew::use_mut_ref(move || None);
+    let selected_output_language = yew::use_mut_ref(move || None);
+    let input_text = yew::use_mut_ref(move || "".into());
+    let output_text_area_node = yew::use_node_ref();
+
+    let on_translate_button_clicked = {
+        let selected_input_language = selected_input_language.clone();
+        let selected_output_language = selected_output_language.clone();
+        let input_text = input_text.clone();
+        let output_text_area_node = output_text_area_node.clone();
+        yew::Callback::from(move |_: web_sys::MouseEvent| {
+            let selected_input_language: &std::cell::RefCell<Option<Language>> =
+                selected_input_language.borrow();
+            let selected_output_language: &std::cell::RefCell<Option<Language>> =
+                selected_output_language.borrow();
+            let input_text: &std::cell::RefCell<String> = input_text.borrow();
+
+            let output_text = if let (Some(input_language), Some(output_language), input_text) = (
+                selected_input_language.borrow().as_ref(),
+                selected_output_language.borrow().as_ref(),
+                <String as AsRef<str>>::as_ref(&input_text.borrow()),
+            ) {
+                let output = format!(
+                    "translate was clicked!\n- input language: {:?}\n- output language: {:?}\n- input text: {}",
+                    input_language, output_language, input_text
+                );
+                log::info!("{output}");
+                output
+            } else {
+                "".into()
             };
 
-            html! {
-                <p key={video.id} onclick={on_video_select}>{format!("{}: {}", video.speaker, video.title)}</p>
+            if let Some(output_text_area_node) =
+                output_text_area_node.cast::<web_sys::HtmlTextAreaElement>()
+            {
+                output_text_area_node.set_value(&output_text);
             }
         })
-        .collect()
-}
-
-#[derive(Properties, PartialEq)]
-struct VideoDetailsProps {
-    video: Video,
-}
-#[function_component(VideoDetails)]
-fn video_details(VideoDetailsProps { video }: &VideoDetailsProps) -> Html {
-    html! {
-        <div>
-            <h3>{ video.title.clone() }</h3>
-            <img src="https://via.placeholder.com/640x360.png?text=Video+Player+Placeholder" alt="video thumbnail" />
-        </div>
-    }
-}
-
-#[function_component(App)]
-fn app() -> Html {
-    let videos = use_state_eq(|| vec![]);
-    {
-        let videos = videos.clone();
-        use_effect_with((), move |_| {
-            wasm_bindgen_futures::spawn_local(async move {
-                //let fetched_videos: Vec<Video> = Request::get("https://yew.rs/tutorial/data.json")
-                let fetched_videos: Vec<Video> = Request::get("/tutorial/data.json")
-                    .send()
-                    .await
-                    .unwrap()
-                    .json()
-                    .await
-                    .unwrap();
-                videos.set(fetched_videos);
-            });
-            || ()
-        });
-    }
-
-    let selected_video = use_state_eq(|| None);
-
-    let on_video_select = {
-        let selected_video = selected_video.clone();
-        Callback::from(move |video: Video| selected_video.set(Some(video)))
     };
 
-    let details = selected_video.as_ref().map(|video| {
-        html! {
-            <VideoDetails video={video.clone()} />
-        }
-    });
+    log::info!("rendering...");
 
-    html! {
+    yew::html! {
         <>
-            <h1>{ "RustConf Explorer" }</h1>
-            <div>
-                <h3>{"Videos to watch"}</h3>
-                <VideoList videos={(*videos).clone()} on_click={on_video_select} />
-            </div>
-            <div>
-                { for details }
-            </div>
+            <components::InputField {input_text} placeholder_text="input text" />
+            <components::LanguageSelect languages={languages.clone()} selected_language={selected_input_language} />
+            <button onclick={on_translate_button_clicked}>{ "translate" }</button>
+            <components::LanguageSelect {languages} selected_language={selected_output_language} />
+            <textarea ref={output_text_area_node}></textarea>
         </>
     }
 }
 
 fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
     yew::Renderer::<App>::new().render();
 }
