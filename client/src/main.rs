@@ -49,27 +49,47 @@ fn app() -> yew::Html {
                 selected_output_language.borrow();
             let input_text: &std::cell::RefCell<String> = input_text.borrow();
 
-            let output_text = if let (Some(input_language), Some(output_language), input_text) = (
+            if let (Some(input_language), Some(output_language), input_text) = (
                 selected_input_language.borrow().as_ref(),
                 selected_output_language.borrow().as_ref(),
                 <String as AsRef<str>>::as_ref(&input_text.borrow()),
             ) {
-                let output = format!(
-                    "translate was clicked!\n- input language: {:?}\n- output language: {:?}\n- input text: {}",
-                    input_language, output_language, input_text
-                );
-                log::info!("{output}");
-                output
-            } else {
-                "".into()
-            };
+                let request = common::TranslationRequest {
+                    source_language_code: input_language.code.clone(),
+                    target_language_code: output_language.code.clone(),
+                    text: input_text.into(),
+                };
 
-            // set output value
-            if let Some(output_text_area_node) =
-                output_text_area_node.cast::<web_sys::HtmlTextAreaElement>()
-            {
-                output_text_area_node.set_value(&output_text);
-            }
+                // send translation request
+                match gloo_net::http::Request::post("/translate").json(&request) {
+                    Err(e) => {
+                        log::error!("could not serialize translation request: {}", e);
+                    }
+                    Ok(request) => {
+                        let output_text_area_node = output_text_area_node.clone();
+                        wasm_bindgen_futures::spawn_local(async move {
+                            match request.send().await {
+                                Ok(response) if response.ok() => {
+                                    // translation successful -> set output value
+                                    if let (Some(output_text_area_node), Ok(translation)) = (
+                                        output_text_area_node
+                                            .cast::<web_sys::HtmlTextAreaElement>(),
+                                        response.json::<String>().await,
+                                    ) {
+                                        output_text_area_node.set_value(&translation);
+                                    }
+                                }
+                                Ok(response) => log::error!(
+                                    "could not translate: {} ({})",
+                                    response.status(),
+                                    response.status_text()
+                                ),
+                                Err(e) => log::error!("could not translate: {}", e),
+                            }
+                        })
+                    }
+                }
+            };
         })
     };
 

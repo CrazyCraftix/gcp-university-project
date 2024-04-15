@@ -43,40 +43,37 @@ async fn languages(
 ) -> Result<actix_web::HttpResponse, actix_web::error::Error> {
     log::info!("retrieving supported languages");
 
-    // fetch languages and map them to type common::Language
-    let languages = match translate_api.fetch_languages().await {
+    match translate_api.fetch_languages().await {
         Err(e) => {
             log::error!("could not fetch supported languages: {}", e);
             Err(actix_web::error::ErrorInternalServerError(e))
         }
-        Ok(None) => Ok(vec![]),
-        Ok(Some(languages)) => Ok(languages
-            .iter()
-            .filter_map(|language| {
-                if let (Some(language_code), Some(display_name), Some(true), Some(true)) = (
-                    &language.language_code,
-                    &language.display_name,
-                    language.support_source,
-                    language.support_target,
-                ) {
-                    Some(common::Language {
-                        code: language_code.into(),
-                        display_name: display_name.into(),
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()),
-    }?;
+        // serialize languages
+        Ok(languages) => match serde_json::to_string(&languages) {
+            Ok(serialized) => Ok(actix_web::HttpResponse::Ok().body(serialized)),
+            Err(e) => {
+                log::error!("could not serialize supported languages");
+                Err(actix_web::error::ErrorInternalServerError(e))
+            }
+        },
+    }
+}
 
-    // serialize languages
-    match serde_json::to_string(&languages) {
-        Ok(serialized) => Ok(actix_web::HttpResponse::Ok().body(serialized)),
+// translate text
+#[actix_web::post("/translate")]
+async fn translate(
+    request: actix_web::web::Json<common::TranslationRequest>,
+    translate_api: actix_web::web::Data<translate_api::TranslateApi>,
+) -> Result<actix_web::HttpResponse, actix_web::error::Error> {
+    log::info!("translating");
+
+    let request = request.0;
+    match translate_api.translate(request).await {
         Err(e) => {
-            log::error!("could not serialize supported languages");
+            log::error!("could not translate: {}", e);
             Err(actix_web::error::ErrorInternalServerError(e))
         }
+        Ok(translation) => Ok(actix_web::HttpResponse::Ok().json(html_escape::decode_html_entities(&translation))),
     }
 }
 
@@ -100,6 +97,7 @@ async fn main() -> std::io::Result<()> {
         actix_web::App::new()
             .app_data(translate_api.clone())
             .service(languages)
+            .service(translate)
             .service(proxy)
             .service(actix_files::Files::new("/", "./dist").index_file("index.html"))
     })
