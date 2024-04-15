@@ -44,7 +44,7 @@ pub fn language_select(props: &Props) -> yew::Html {
                 .as_ref()
                 .map_or(false, |selected_language| selected_language == language);
             yew::html! {
-                <option key={language.id} {selected}>{ language.display_string.clone() }</option>
+                <option key={language.code.clone()} {selected}>{ language.display_name.clone() }</option>
             }
         })
         .collect::<yew::Html>();
