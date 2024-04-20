@@ -5,6 +5,7 @@ After=network.target
 [Service]
 User=root
 Type=simple
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/translate-webserver/google_credentials.json"
 ExecStart=/usr/local/bin/translate-webserver
 
 [Install]

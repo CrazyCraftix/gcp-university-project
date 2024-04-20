@@ -4,6 +4,18 @@
   become: true
 
   tasks:
+  - name: create etc folder
+    file:
+      path: /etc/translate-webserver
+      state: directory
+      mode: 0755
+
+  - name: copy google credentials
+    copy:
+      src: ../google_credentials.json
+      dest: /etc/translate-webserver/google_credentials.json
+      mode: 0400
+
   - name: copy website data
     copy:
       src: ./www
@@ -24,8 +36,8 @@
     systemd:
       daemon_reload: yes
 
-  - name: enable and start systemd service
+  - name: enable and (re)start systemd service
     systemd:
       name: translate-webserver
-      state: started
+      state: restarted
       enabled: yes
