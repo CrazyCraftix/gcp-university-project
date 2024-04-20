@@ -27,6 +27,15 @@ resource "google_compute_firewall" "web-traffic" {
   }
 }
 
+resource "google_redis_instance" "redis-cache" {
+  name           = "redis-cache"
+  memory_size_gb = 1
+
+  #lifecycle {
+  #  prevent_destroy = true
+  #}
+}
+
 resource "google_compute_instance" "webserver-1" {
   name         = "webserver-1"
   machine_type = "e2-micro"
@@ -53,4 +62,8 @@ resource "local_file" "ansible-node-inventory" {
     [webservers]
     ${google_compute_instance.webserver-1.network_interface.0.access_config.0.nat_ip}
     EOF
+}
+
+output "redis_ip" {
+    value = google_redis_instance.redis-cache.host
 }
