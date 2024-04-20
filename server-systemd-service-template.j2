@@ -1,0 +1,11 @@
+[Unit]
+Description=translate-webserver
+After=network.target
+
+[Service]
+User=root
+Type=simple
+ExecStart=/usr/local/bin/translate-webserver
+
+[Install]
+WantedBy=multi-user.target

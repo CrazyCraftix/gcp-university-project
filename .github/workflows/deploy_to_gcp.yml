@@ -68,3 +68,12 @@ jobs:
           git add ${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
           git commit -m "new state after deploy_to_gcp"
           git push -u origin ${{ env.DEPLOY_STATE_BRANCH_NAME }}
+
+      - name: run ansible
+        working-directory: ./project
+        run: |
+          cat ansible-node-inventory
+          ansible-playbook -i ansible-node-inventory --key-file "../deploy-state/id_ed25519" ansible-playbook.yml --user user
+        env:
+          ANSIBLE_HOST_KEY_CHECKING: false
+
