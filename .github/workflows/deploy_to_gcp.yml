@@ -25,6 +25,7 @@ jobs:
         run: |
           cargo build --release -p server
           cargo install trunk
+          rustup target add wasm32-unknown-unknown
           cd client
           trunk build --release
 
