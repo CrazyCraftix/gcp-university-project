@@ -73,7 +73,9 @@ async fn translate(
             log::error!("could not translate: {}", e);
             Err(actix_web::error::ErrorInternalServerError(e))
         }
-        Ok(translation) => Ok(actix_web::HttpResponse::Ok().json(html_escape::decode_html_entities(&translation))),
+        Ok(translation) => {
+            Ok(actix_web::HttpResponse::Ok().json(html_escape::decode_html_entities(&translation)))
+        }
     }
 }
 
@@ -93,13 +95,15 @@ async fn main() -> std::io::Result<()> {
             .expect("could not initialize translate api"),
     );
 
+    let web_root = std::env::var("WEB_ROOT").unwrap_or("/var/www".to_string());
+
     actix_web::HttpServer::new(move || {
         actix_web::App::new()
             .app_data(translate_api.clone())
             .service(languages)
             .service(translate)
             .service(proxy)
-            .service(actix_files::Files::new("/", "./dist").index_file("index.html"))
+            .service(actix_files::Files::new("/", web_root.clone()).index_file("index.html"))
     })
     .bind(("127.0.0.1", 8080))?
     .run()
