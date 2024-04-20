@@ -83,29 +83,45 @@ async fn translate(
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    let credentials = google_translate3::oauth2::read_service_account_key(
-        std::env::var("GOOGLE_CREDENTIALS").expect("environment variable GOOGLE_CREDENTIALS not set - it needs to contain the path to the json file with service account credentials!")
-    )
-    .await
-    .expect("could not read service account credentials - does the environment variable GOOGLE_CREDENTIALS contain the path to a valid json file with service account credentials?");
-
-    let translate_api = actix_web::web::Data::new(
-        translate_api::TranslateApi::new(credentials)
-            .await
-            .expect("could not initialize translate api"),
-    );
+    // initialize translate api using environment variable: GOOGLE_APPLICATION_CREDENTIALS
+    let translate_api = match std::env::var("GOOGLE_APPLICATION_CREDENTIALS") {
+        Ok(path) => {
+            match google_translate3::oauth2::read_service_account_key(&path).await {
+                Ok(credentials) => match translate_api::TranslateApi::new(credentials).await {
+                    Ok(translate_api) => Some(actix_web::web::Data::new(translate_api)),
+                    Err(e) => {
+                        log::error!("could not initialize translate api: {}", e);
+                        None
+                    }
+                },
+                Err(e) => {
+                    log::error!("could not read google credentials from $GOOGLE_APPLICATION_CREDENTIALS={}: {}", path, e);
+                    None
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!(
+                "could not find GOOGLE_APPLICATION_CREDENTIALS environment variable: {}",
+                e
+            );
+            None
+        }
+    };
 
     let web_root = std::env::var("WEB_ROOT").unwrap_or("/var/www".to_string());
 
     actix_web::HttpServer::new(move || {
-        actix_web::App::new()
-            .app_data(translate_api.clone())
-            .service(languages)
+        let mut app = actix_web::App::new();
+        if let Some(translate_api) = translate_api.clone() {
+            app = app.app_data(translate_api.clone());
+        }
+        app.service(languages)
             .service(translate)
             .service(proxy)
             .service(actix_files::Files::new("/", web_root.clone()).index_file("index.html"))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 80))?
     .run()
     .await
 }
