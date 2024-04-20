@@ -6,8 +6,8 @@
   tasks:
   - name: copy website data
     copy:
-      src: ./dist
-      dest: /var/www
+      src: ./www
+      dest: /var/
 
   - name: copy webserver binary
     copy:
