@@ -15,6 +15,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: checkout project files
+        uses: actions/checkout@v4
+        with:
+          path: ./project
+
       - name: checkout encrypted deploy state
         uses: actions/checkout@v4
         with:
@@ -23,11 +28,6 @@ jobs:
           sparse-checkout: |
             ${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
           sparse-checkout-cone-mode: false
-
-      - name: checkout project files
-        uses: actions/checkout@v4
-        with:
-          path: ./project
 
       - name: decrypt and unzip deploy state
         run: |
