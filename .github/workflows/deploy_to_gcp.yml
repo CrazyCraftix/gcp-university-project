@@ -7,22 +7,22 @@ permissions:
   contents: write
 
 env:
-  TERRAFORM_STATE_BRANCH_NAME: terraform-state
-  ENCRYPTED_TERRAFORM_STATE_FILE_NAME: terraform.tfstate.enc
+  DEPLOY_STATE_BRANCH_NAME: deploy-state
+  ENCRYPTED_DEPLOY_STATE_FILE_NAME: deploy-state.enc
 
 jobs:
   deploy_to_gcp:
     runs-on: ubuntu-latest
 
     steps:
-      - name: checkout encrypted terraform-state file
+      - name: checkout encrypted deploy state
         continue-on-error: true
         uses: actions/checkout@v4
         with:
-          path: ./terraform-state
-          ref: ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
+          path: ./deploy-state-enc
+          ref: ${{ env.DEPLOY_STATE_BRANCH_NAME }}
           sparse-checkout: |
-            ${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+            ${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
           sparse-checkout-cone-mode: false
 
       - name: checkout project files
@@ -30,35 +30,41 @@ jobs:
         with:
           path: ./project
 
-      - name: decrypt terraform-state file
+      - name: decrypt and unzip deploy state
         continue-on-error: true
-        run: openssl enc -d -in ./terraform-state/${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }} -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}"  -out ./project/terraform.tfstate
+        run: |
+          openssl enc -d -in ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }} -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}"  -out ./deploy-state.tar.gz
+          tar -xzf ./deploy-state.tar.gz
+
+      - name: initialize deploy state if it doesn't exist
+        run: |
+          [ ! -f "./deploy-state/id_ed25519" ] && mkdir -p deploy-state && ssh-keygen -t ed25519 -f ./deploy-state/id_ed25519 -N "" || true
 
       - name: setup terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
 
       - name: run terraform apply
         working-directory: ./project
         run: |
           terraform init
-          terraform fmt --check
-          terraform plan
-          terraform apply --auto-approve
+          terraform apply --auto-approve --state=../deploy-state/terraform_state.tfstate --var="ssh_public_key_file_path=../deploy-state/id_ed25519.pub" --var="gcp_project_id=$(echo $GOOGLE_CREDENTIALS | jq -r .project_id)"
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
 
-      - name: encrypt new terraform-state file
-        run: openssl enc -in ./project/terraform.tfstate -aes-256-cbc -pbkdf2 -pass  pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}" -out ./terraform-state/${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+      - name: zip and encrypt new deploy state
+        run: |
+          tar -czf ./deploy-state.tar.gz ./deploy-state
+          openssl enc -in ./deploy-state.tar.gz -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}" -out ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
 
-      - name: push new encrypted terraform-state file
-        working-directory: ./terraform-state
+      - name: push new encrypted deploy state
+        working-directory: ./deploy-state-enc
         run: |
           # create terraform-state branch if it doesn't exist yet
-          git ls-remote --exit-code --heads origin ${{ env.TERRAFORM_STATE_BRANCH_NAME }} || git switch --orphan ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
+          git ls-remote --exit-code --heads origin ${{ env.DEPLOY_STATE_BRANCH_NAME }} || git switch --orphan ${{ env.DEPLOY_STATE_BRANCH_NAME }}
 
           git config user.name "${{github.actor}}"
           git config user.email "${{github.actor}}@users.noreply.github.com"
 
-          git add ${{ env.ENCRYPTED_TERRAFORM_STATE_FILE_NAME }}
+          git add ${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
           git commit -m "new state after deploy_to_gcp"
-          git push -u origin ${{ env.TERRAFORM_STATE_BRANCH_NAME }}
+          git push -u origin ${{ env.DEPLOY_STATE_BRANCH_NAME }}
