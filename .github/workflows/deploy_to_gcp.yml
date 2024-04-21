@@ -20,14 +20,14 @@ jobs:
         with:
           path: ./project
 
-            #      - name: build project
-            #        working-directory: ./project
-            #        run: |
-            #          cargo build --release -p server
-            #          cargo install trunk
-            #          rustup target add wasm32-unknown-unknown
-            #          cd client
-            #          trunk build --release
+      - name: build project
+        working-directory: ./project
+        run: |
+          cargo build --release -p server
+          #          cargo install trunk
+          #          rustup target add wasm32-unknown-unknown
+          #          cd client
+          #          trunk build --release
 
       - name: checkout encrypted deploy state
         continue-on-error: true
