@@ -61,9 +61,8 @@ resource "local_file" "ansible-node-inventory" {
     content     = <<-EOF
     [webservers]
     ${google_compute_instance.webserver-1.network_interface.0.access_config.0.nat_ip}
-    EOF
-}
 
-output "redis_ip" {
-    value = google_redis_instance.redis-cache.host
+    [redis_cache]
+    ${google_redis_instance.redis-cache.host}
+    EOF
 }

@@ -82,7 +82,8 @@ jobs:
         working-directory: ./project
         run: |
           echo '${{ secrets.GOOGLE_CREDENTIALS }}' > ../google_credentials.json
-          ansible-playbook -i ansible-node-inventory --key-file "../deploy-state/id_ed25519" ansible-playbook.yml --user user
+          echo 'ansible-node-inventory:' && cat ansible-node-inventory
+          ansible-playbook -i ansible-node-inventory --key-file "../deploy-state/id_ed25519" ansible-playbook.yml --user user --extra-vars
           rm ../google_credentials.json
         env:
           ANSIBLE_HOST_KEY_CHECKING: false
