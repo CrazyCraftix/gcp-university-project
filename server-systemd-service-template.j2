@@ -6,7 +6,7 @@ After=network.target
 User=root
 Type=simple
 Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/translate-webserver/google_credentials.json"
-Environment="REDIS_CONNECTION={{ redis_host }}"
+Environment="REDIS_CONNECTION=redis://{{ redis_host }}:6379"
 ExecStart=/usr/local/bin/translate-webserver
 
 [Install]
