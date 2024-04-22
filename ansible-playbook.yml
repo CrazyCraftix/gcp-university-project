@@ -2,8 +2,15 @@
 - name: webserver setup
   hosts: "webservers"
   become: true
+  gather_facts: false
 
   tasks:
+  - name: wait until targets become reachable/usable
+    wait_for_connection:
+
+  - name: gather facts manually
+    setup:
+
   - name: create etc folder
     file:
       path: /etc/translate-webserver

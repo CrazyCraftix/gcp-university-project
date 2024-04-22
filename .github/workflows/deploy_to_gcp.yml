@@ -24,10 +24,10 @@ jobs:
         working-directory: ./project
         run: |
           cargo build --release -p server
-          #          cargo install trunk
-          #          rustup target add wasm32-unknown-unknown
-          #          cd client
-          #          trunk build --release
+          cargo install trunk
+          rustup target add wasm32-unknown-unknown
+          cd client
+          trunk build --release
 
       - name: checkout encrypted deploy state
         continue-on-error: true
@@ -42,7 +42,7 @@ jobs:
       - name: decrypt and unzip deploy state
         continue-on-error: true
         run: |
-          openssl enc -d -in ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }} -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}"  -out ./deploy-state.tar.gz
+          openssl enc -d -in ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }} -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.DEPLOY_STATE_PASSWORD }}"  -out ./deploy-state.tar.gz
           tar -xzf ./deploy-state.tar.gz
 
       - name: initialize deploy state if it doesn't exist
@@ -63,7 +63,7 @@ jobs:
       - name: zip and encrypt new deploy state
         run: |
           tar -czf ./deploy-state.tar.gz ./deploy-state
-          openssl enc -in ./deploy-state.tar.gz -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.TERRAFORM_STATE_PASSWORD }}" -out ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
+          openssl enc -in ./deploy-state.tar.gz -aes-256-cbc -pbkdf2 -pass pass:"${{ secrets.DEPLOY_STATE_PASSWORD }}" -out ./deploy-state-enc/${{ env.ENCRYPTED_DEPLOY_STATE_FILE_NAME }}
 
       - name: push new encrypted deploy state
         working-directory: ./deploy-state-enc
